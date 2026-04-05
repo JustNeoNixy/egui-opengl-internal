@@ -3,11 +3,12 @@ use std::ptr::null_mut;
 use windows::{
     core::PCSTR,
     Win32::{
-                Graphics::OpenGL::wglGetProcAddress,
+        Foundation::HMODULE,
+        Graphics::OpenGL::wglGetProcAddress,
         System::{
             Console::{AllocConsole, FreeConsole},
             LibraryLoader::{FreeLibraryAndExitThread, GetModuleHandleA, GetProcAddress},
-        }, Foundation::HMODULE,
+        },
     },
 };
 
@@ -59,7 +60,7 @@ pub fn free_console() {
 
 pub fn unload() {
     unsafe {
-        let module = get_module("example_wnd.dll");
+        let module = get_module("example_mc.dll");
         FreeLibraryAndExitThread(module, 0);
     }
 }

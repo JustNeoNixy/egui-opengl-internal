@@ -1,0 +1,66 @@
+00000001	0.00000000	33140	[ClassCache] JVMTI reports 30077 loaded classes	
+00000002	0.14296530	33140	[ClassCache] Cached 30077 classes  (Fabric=true, Vanilla=false)	
+00000003	0.14336529	33140	[DEBUG] Starting Minecraft initialization...	
+00000004	0.14353460	33140	[DEBUG] Successfully attached to JNI environment	
+00000005	0.14357901	33140	[DEBUG] Looking for Minecraft class: net/minecraft/class_310 (Fabric=true)	
+00000006	0.14361580	33140	[DEBUG] Found Minecraft class via JVMTI cache	
+00000007	0.14365460	33140	[DEBUG] Successfully created global class reference	
+00000008	0.14370760	33140	[DEBUG] Successfully found instance field ID: field_1700	
+00000009	0.14384571	33140	[DEBUG] Successfully got static field value	
+00000010	0.14389430	33140	[DEBUG] Successfully extracted object from field value	
+00000011	0.14390910	33140	[DEBUG] Successfully created global instance reference	
+00000012	0.14393750	33140	[DEBUG] Minecraft initialization completed successfully!	
+00000013	0.14401640	33140	[Sprint] Initializing...	
+00000014	0.14411360	33140	[Sprint] Found LocalPlayer class via JVMTI cache	
+00000015	0.14418550	33140	[LocalPlayer] Found class via JVMTI cache	
+00000016	0.14424621	33140	[Sprint] LocalPlayer::init succeeded	
+00000017	0.14427391	33140	[Sprint] Initialization complete	
+00000018	0.14435920	33140	[LocalPlayer] Found class via JVMTI cache	
+00000019	0.14447020	33140	[FastBreak] Found GameMode class via JVMTI cache	
+00000020	0.14457430	33140	[JniLookups] Starting initialization...	
+00000021	0.14461380	33140	[JniLookups] Fabric=true	
+00000022	0.14464800	33140	[JniLookups] OK   field:  Minecraft.level	
+00000023	0.14467940	33140	[JniLookups] OK   field:  Minecraft.deltaTracker	
+00000024	0.14471529	33140	[JniLookups] OK   field:  Minecraft.gameRenderer	
+00000025	0.14474630	33140	[JniLookups] Found class 'java/util/List' in JVMTI cache	
+00000026	0.14477690	33140	[JniLookups] Found class 'net/minecraft/class_638' in JVMTI cache	
+00000027	0.14480630	33140	[JniLookups] Found class 'net/minecraft/class_9779' in JVMTI cache	
+00000028	0.14483590	33140	[JniLookups] Found class 'net/minecraft/class_757' in JVMTI cache	
+00000029	0.14486501	33140	[JniLookups] Found class 'net/minecraft/class_4184' in JVMTI cache	
+00000030	0.14489380	33140	[JniLookups] Found class 'net/minecraft/class_243' in JVMTI cache	
+00000031	0.14492260	33140	[JniLookups] Found class 'net/minecraft/class_1309' in JVMTI cache	
+00000032	0.14495780	33140	[JniLookups] Found class 'net/minecraft/class_1657' in JVMTI cache	
+00000033	0.14497910	33140	[JniLookups] Found class 'net/minecraft/class_2561' in JVMTI cache	
+00000034	0.14500789	33140	[JniLookups] Found class 'net/minecraft/class_1297' in JVMTI cache	
+00000035	0.14504699	33140	[JniLookups] OK   method: Entity.getX	
+00000036	0.14507580	33140	[JniLookups] OK   method: Entity.getY	
+00000037	0.14510649	33140	[JniLookups] OK   method: Entity.getEyeY	
+00000038	0.14514031	33140	[JniLookups] OK   method: Entity.getZ	
+00000039	0.14517170	33140	[JniLookups] OK   method: Entity.getId	
+00000040	0.14520420	33140	[JniLookups] OK   method: Entity.getName	
+00000041	0.14523409	33140	[JniLookups] OK   field:  Entity.oldX	
+00000042	0.14526311	33140	[JniLookups] OK   field:  Entity.oldY	
+00000043	0.14529140	33140	[JniLookups] OK   field:  Entity.oldZ	
+00000044	0.14532609	33140	[JniLookups] OK   method: LivingEntity.getHealth	
+00000045	0.14539510	33140	[JniLookups] JNI exception at Component.getString	
+00000046	0.14542340	33140	[JniLookups] MISS method: Component.getString	
+00000047	0.14546610	33140	[JniLookups] OK   method: ClientLevel.players	
+00000048	0.14563030	33140	[JniLookups] OK   method: List.size	
+00000049	0.14621240	33140	[JniLookups] OK   method: List.get	
+00000050	0.14624950	33140	[JniLookups] OK   method: DeltaTracker.getGameTimeDelta	
+00000051	0.14628591	33140	[JniLookups] OK   method: GameRenderer.getMainCamera	
+00000052	0.14632320	33140	[JniLookups] OK   method: GameRenderer.getFov	
+00000053	0.14639790	33140	[JniLookups] JNI exception at Camera.getPosition	
+00000054	0.14648890	33140	[JniLookups] MISS method: Camera.getPosition	
+00000055	0.14650060	33140	[JniLookups] OK   method: Camera.getYaw	
+00000056	0.14653590	33140	[JniLookups] OK   method: Camera.getPitch	
+00000057	0.14657030	33140	[JniLookups] OK   field:  Vec3.x	
+00000058	0.14659880	33140	[JniLookups] OK   field:  Vec3.y	
+00000059	0.14662570	33140	[JniLookups] OK   field:  Vec3.z	
+00000060	0.14665210	33140	[JniLookups] CRITICAL: Required camera lookups missing — ESP disabled	
+00000061	0.14667749	33140	  game_renderer_field=true get_main_camera=true get_fov=true	
+00000062	0.14670050	33140	  get_position=false get_yaw=true get_pitch=true	
+00000063	0.14672980	33140	  vec3_x=true vec3_y=true vec3_z=true	
+00000064	0.14730650	33140	[example-mc] Hook setup successful	
+00000065	0.16264720	33140	[example-mc] wglSwapBuffers hooked.	
+00000066	28.03471947	12768	Suspending	

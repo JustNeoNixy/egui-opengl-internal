@@ -1,5 +1,6 @@
 [workspace]
 members = [
-    "example-wnd",
+    #"example-wnd",
+    "example-mc",
     "egui-opengl-internal"
 ]
