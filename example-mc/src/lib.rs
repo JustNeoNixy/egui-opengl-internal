@@ -11,7 +11,9 @@ use crate::features::combat::velocity::Velocity;
 use crate::features::world::esp::Esp;
 use crate::utils::renderer::EspRenderer;
 use core::client::Minecraft;
-use features::world::{fast_break::FastBreak, fast_place::FastPlace, sprint::Sprint};
+use features::world::{
+    fast_break::FastBreak, fast_place::FastPlace, fullbright::Fullbright, sprint::Sprint,
+};
 use once_cell::sync::OnceCell;
 
 static ESP: OnceCell<Esp> = OnceCell::new();
@@ -21,6 +23,7 @@ static FAST_PLACE: OnceCell<FastPlace> = OnceCell::new();
 static FAST_BREAK: OnceCell<FastBreak> = OnceCell::new();
 static VELOCITY: OnceCell<Velocity> = OnceCell::new();
 static SPRINT: OnceCell<Sprint> = OnceCell::new();
+static FULLBRIGHT: OnceCell<Fullbright> = OnceCell::new();
 
 use egui::{Color32, Context};
 
@@ -133,6 +136,9 @@ fn hk_wgl_swap_buffers(hdc: HDC) -> HRESULT {
         }
         if let Some(esp) = ESP.get() {
             esp.tick();
+        }
+        if let Some(fb) = FULLBRIGHT.get() {
+            fb.on_update();
         }
         hit_result::tick_trigger_bot();
         APP.render(hdc);
@@ -451,6 +457,13 @@ fn ui(ctx: &Context, _: &mut i32) {
                                                             }
                                                         );
                                                     }
+
+                                                    if let Some(fb) = FULLBRIGHT.get() {
+                                                        let fullbright_toggle = FeatureToggle::new("Fullbright");
+                                                        fullbright_toggle.show(ui, fb.is_enabled(), |enabled| fb.set_enabled(enabled), |ui| {
+                                                            ui.label("Coming Soon!");
+                                                        });
+                                                    }
                                                 }
 
                                             }
@@ -491,13 +504,18 @@ unsafe fn main_thread(_hinst: usize) {
         let _ = FAST_BREAK.set(FastBreak::new());
         let _ = VELOCITY.set(Velocity::new());
         let _ = SPRINT.set(Sprint::new());
+        let _ = FULLBRIGHT.set(Fullbright::new());
         println!("[Cheat] Sprint initialized");
         Sprint::init();
         println!("[Cheat] Sprint JNI initialized");
         Minecraft::with(|mc| {
             let _ = crate::core::local_player::LocalPlayer::init(mc);
-            //TODO: toggle-able fullbright
-            let _ = crate::core::client::Minecraft::enable_fullbright(mc);
+
+            if crate::features::world::fullbright::try_init(mc) {
+                println!("[Cheat] Fullbright JNI initialized");
+            } else {
+                println!("[Cheat] Fullbright init failed");
+            }
         });
         if crate::features::world::fast_break::try_init() {
             println!("[Cheat] FastBreak JNI initialized");
