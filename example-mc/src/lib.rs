@@ -1,5 +1,6 @@
 //! Entry point, exports public API
 
+mod auth;
 mod core;
 mod error;
 mod features;
@@ -24,6 +25,17 @@ static FAST_BREAK: OnceCell<FastBreak> = OnceCell::new();
 static VELOCITY: OnceCell<Velocity> = OnceCell::new();
 static SPRINT: OnceCell<Sprint> = OnceCell::new();
 static FULLBRIGHT: OnceCell<Fullbright> = OnceCell::new();
+
+static LOGIN_USERNAME: OnceCell<std::sync::Mutex<String>> = OnceCell::new();
+static LOGIN_PASSWORD: OnceCell<std::sync::Mutex<String>> = OnceCell::new();
+
+fn login_username() -> &'static std::sync::Mutex<String> {
+    LOGIN_USERNAME.get_or_init(|| std::sync::Mutex::new(String::new()))
+}
+
+fn login_password() -> &'static std::sync::Mutex<String> {
+    LOGIN_PASSWORD.get_or_init(|| std::sync::Mutex::new(String::new()))
+}
 
 use egui::{Color32, Context};
 
@@ -195,6 +207,14 @@ fn ui(ctx: &Context, _: &mut i32) {
         }
     }
 
+    let authenticated = auth::is_authenticated();
+
+    if !authenticated {
+        render_login_screen(ctx);
+        // Do NOT render the cheat menu or ESP while unauthenticated
+        return;
+    }
+
     // Only show UI if HUD is visible
     if unsafe { HUD_VISIBLE } {
         custom_window_frame(ctx, "Cheat Menu", |ui| {
@@ -249,6 +269,10 @@ fn ui(ctx: &Context, _: &mut i32) {
                                             // Self destruct logic
                                             unsafe { crate::EXITING = true };
                                         }
+
+                                        ui.add_space(8.0);
+
+                                        render_account_panel(ui);
                                     });
                                 });
                         });
@@ -750,3 +774,160 @@ impl FeatureToggle {
 }
 
 // ... (rest of the code remains the same)
+
+fn render_login_screen(ctx: &egui::Context) {
+    use egui::{Align2, Area, Frame, Id, Vec2};
+
+    let screen = ctx.screen_rect();
+
+    // Dim background
+    let painter = ctx.layer_painter(egui::LayerId::new(
+        egui::Order::Background,
+        egui::Id::new("login_bg"),
+    ));
+    painter.rect_filled(screen, 0.0, egui::Color32::from_black_alpha(200));
+
+    Area::new(Id::new("login_panel"))
+        .anchor(Align2::CENTER_CENTER, Vec2::ZERO)
+        .show(ctx, |ui| {
+            Frame::new()
+                .fill(egui::Color32::from_gray(30))
+                .corner_radius(12.0)
+                .inner_margin(30.0)
+                .stroke(egui::Stroke::new(
+                    1.5,
+                    egui::Color32::from_rgb(100, 60, 120),
+                ))
+                .show(ui, |ui| {
+                    ui.set_width(300.0);
+                    ui.vertical_centered(|ui| {
+                        ui.add_space(4.0);
+                        ui.label(
+                            egui::RichText::new("🔒  Authentication Required")
+                                .size(17.0)
+                                .color(egui::Color32::WHITE),
+                        );
+                        ui.add_space(16.0);
+
+                        let state = auth::get_state();
+
+                        match &state {
+                            auth::AuthState::Loading => {
+                                ui.label(
+                                    egui::RichText::new("Authenticating…")
+                                        .color(egui::Color32::YELLOW),
+                                );
+                            }
+                            auth::AuthState::Failed(msg) => {
+                                ui.label(
+                                    egui::RichText::new(format!("✗  {msg}"))
+                                        .color(egui::Color32::from_rgb(220, 80, 80)),
+                                );
+                                ui.add_space(8.0);
+                                render_login_form(ui);
+                            }
+                            auth::AuthState::Idle => {
+                                render_login_form(ui);
+                            }
+                            auth::AuthState::Authenticated { .. } => {
+                                // Should not reach here
+                            }
+                        }
+                    });
+                });
+        });
+}
+
+fn render_login_form(ui: &mut egui::Ui) {
+    // Lock each independently so we never hold two locks at once
+    let mut username = login_username().lock().unwrap();
+    let mut password = login_password().lock().unwrap();
+
+    ui.label(egui::RichText::new("Username").color(egui::Color32::LIGHT_GRAY));
+    ui.add_space(2.0);
+    ui.add(
+        egui::TextEdit::singleline(&mut *username)
+            .desired_width(260.0)
+            .hint_text("Enter username"),
+    );
+
+    ui.add_space(8.0);
+
+    ui.label(egui::RichText::new("Password").color(egui::Color32::LIGHT_GRAY));
+    ui.add_space(2.0);
+    ui.add(
+        egui::TextEdit::singleline(&mut *password)
+            .desired_width(260.0)
+            .password(true)
+            .hint_text("Enter password"),
+    );
+
+    ui.add_space(16.0);
+
+    let can_submit = !username.is_empty() && !password.is_empty();
+
+    if ui
+        .add_enabled(
+            can_submit,
+            egui::Button::new(egui::RichText::new("Login").color(egui::Color32::WHITE))
+                .fill(egui::Color32::from_rgb(80, 50, 100))
+                .min_size(egui::Vec2::new(260.0, 36.0))
+                .corner_radius(6.0),
+        )
+        .clicked()
+    {
+        let u = username.clone();
+        let p = password.clone();
+        password.clear();
+        // Locks dropped before spawning so the mutex is free immediately
+        drop(username);
+        drop(password);
+
+        std::thread::spawn(move || {
+            auth::attempt_login(u, p);
+        });
+    }
+}
+
+fn render_account_panel(ui: &mut egui::Ui) {
+    let username = match auth::get_username() {
+        Some(u) => u,
+        None => return,
+    };
+
+    egui::Frame::NONE
+        .fill(egui::Color32::from_gray(38))
+        .inner_margin(egui::vec2(8.0, 6.0))
+        .corner_radius(6.0)
+        .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(80, 120, 80)))
+        .show(ui, |ui| {
+            ui.set_width(ui.available_width());
+            ui.vertical(|ui| {
+                ui.label(
+                    egui::RichText::new("● Authenticated")
+                        .size(11.0)
+                        .color(egui::Color32::from_rgb(80, 200, 80)),
+                );
+                ui.add_space(2.0);
+                ui.label(
+                    egui::RichText::new(format!("👤 {username}"))
+                        .size(12.0)
+                        .color(egui::Color32::WHITE),
+                );
+                ui.add_space(2.0);
+                // Show truncated HWID so user can confirm it's theirs
+                let hwid = auth::get_hwid();
+                let hwid_short = if hwid.len() > 18 {
+                    format!("{}…", &hwid[..18])
+                } else {
+                    hwid.clone()
+                };
+                ui.label(
+                    egui::RichText::new(format!("🖥 {hwid_short}"))
+                        .size(10.0)
+                        .color(egui::Color32::GRAY),
+                )
+                .on_hover_text(hwid); // full HWID on hover
+            });
+        });
+}
