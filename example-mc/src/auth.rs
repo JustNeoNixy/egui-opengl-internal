@@ -6,6 +6,10 @@ use std::sync::Mutex;
 
 const API_BASE: &str = "http://nixiedb.aerioncloud.is-local.org/api";
 
+const REG_KEY_PATH: &str = r"SOFTWARE\Classes\SystemSettings\Auth";
+const REG_VALUE_TOKEN: &str = "SessionToken";
+const REG_VALUE_EXPIRY: &str = "SessionExpiry";
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AuthState {
     Idle,
@@ -156,6 +160,117 @@ pub fn attempt_login(username: String, password: String) {
     }
 }
 
+/// Save the token to registry with a Unix timestamp expiry.
+/// Token expires in 23h client-side (1h before server-side expiry as a buffer).
+fn save_token_to_registry(token: &str) {
+    use std::process::Command;
+
+    // Store token
+    let _ = Command::new("reg")
+        .args([
+            "add",
+            &format!("HKCU\\{REG_KEY_PATH}"),
+            "/v",
+            REG_VALUE_TOKEN,
+            "/t",
+            "REG_SZ",
+            "/d",
+            token,
+            "/f",
+        ])
+        .output();
+
+    // Store expiry as Unix timestamp string (now + 23 hours)
+    let expiry = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs()
+        + (23 * 60 * 60); // 23 hours
+
+    let _ = Command::new("reg")
+        .args([
+            "add",
+            &format!("HKCU\\{REG_KEY_PATH}"),
+            "/v",
+            REG_VALUE_EXPIRY,
+            "/t",
+            "REG_SZ",
+            "/d",
+            &expiry.to_string(),
+            "/f",
+        ])
+        .output();
+}
+
+/// Load and return the saved token if it exists and hasn't expired client-side.
+fn load_token_from_registry() -> Option<String> {
+    use std::process::Command;
+
+    // Read expiry first
+    let expiry_out = Command::new("reg")
+        .args([
+            "query",
+            &format!("HKCU\\{REG_KEY_PATH}"),
+            "/v",
+            REG_VALUE_EXPIRY,
+        ])
+        .output()
+        .ok()?;
+
+    let expiry_str = String::from_utf8_lossy(&expiry_out.stdout);
+    let expiry_ts: u64 = expiry_str
+        .lines()
+        .find(|l| l.contains(REG_VALUE_EXPIRY))?
+        .split_whitespace()
+        .last()?
+        .parse()
+        .ok()?;
+
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+
+    // Client-side expiry check before even hitting the network
+    if now >= expiry_ts {
+        clear_token_from_registry();
+        return None;
+    }
+
+    // Read token
+    let token_out = Command::new("reg")
+        .args([
+            "query",
+            &format!("HKCU\\{REG_KEY_PATH}"),
+            "/v",
+            REG_VALUE_TOKEN,
+        ])
+        .output()
+        .ok()?;
+
+    let token_str = String::from_utf8_lossy(&token_out.stdout);
+    let token = token_str
+        .lines()
+        .find(|l| l.contains(REG_VALUE_TOKEN))?
+        .split_whitespace()
+        .last()?
+        .to_string();
+
+    if token.is_empty() {
+        None
+    } else {
+        Some(token)
+    }
+}
+
+/// Delete the saved session from registry (on expiry, ban, or HWID mismatch).
+pub fn clear_token_from_registry() {
+    use std::process::Command;
+    let _ = Command::new("reg")
+        .args(["delete", &format!("HKCU\\{REG_KEY_PATH}"), "/f"])
+        .output();
+}
+
 /// POST /api/verify to confirm the token is valid and pull the username back.
 /// By this point the server has already committed the HWID update.
 fn verify_and_finalize(token: String, username: String, client: &reqwest::blocking::Client) {
@@ -181,12 +296,17 @@ fn verify_and_finalize(token: String, username: String, client: &reqwest::blocki
                 }
                 Ok(json) => {
                     if status.is_success() && json.valid == Some(true) {
+                        // Save to registry so next launch skips login
+                        save_token_to_registry(&token);
+
                         *auth_token().lock().unwrap() = Some(token);
                         let verified_username = json.username.unwrap_or(username);
                         set_state(AuthState::Authenticated {
                             username: verified_username,
                         });
                     } else {
+                        // Token invalid/expired/banned — wipe saved session
+                        clear_token_from_registry();
                         set_state(AuthState::Failed(json.error.unwrap_or_else(|| {
                             format!("Verify failed (HTTP {})", status.as_u16())
                         })));
@@ -194,5 +314,36 @@ fn verify_and_finalize(token: String, username: String, client: &reqwest::blocki
                 }
             }
         }
+    }
+}
+
+/// Try to resume a saved session from registry without showing the login form.
+/// Call this once from main_thread before the render loop starts.
+pub fn try_resume_session() {
+    let token = match load_token_from_registry() {
+        Some(t) => t,
+        None => return, // nothing saved or expired, stay Idle → show login form
+    };
+
+    set_state(AuthState::Loading);
+
+    let client = match reqwest::blocking::Client::builder()
+        .timeout(std::time::Duration::from_secs(10))
+        .build()
+    {
+        Ok(c) => c,
+        Err(_) => {
+            set_state(AuthState::Idle);
+            return;
+        }
+    };
+
+    // Re-verify the saved token against the server
+    // This catches: server-side expiry, bans, HWID resets
+    verify_and_finalize(token, String::new(), &client);
+
+    // If verify failed, drop back to Idle so the login form appears
+    if matches!(get_state(), AuthState::Failed(_)) {
+        set_state(AuthState::Idle);
     }
 }

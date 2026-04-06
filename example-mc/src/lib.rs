@@ -507,6 +507,12 @@ fn ui(ctx: &Context, _: &mut i32) {
 unsafe fn main_thread(_hinst: usize) {
     utils::alloc_console();
 
+    // Try to skip login if a valid session token is saved in registry
+    // Runs in background so it doesn't block DLL injection
+    std::thread::spawn(|| {
+        auth::try_resume_session();
+    });
+
     // Build the JVMTI class cache BEFORE Minecraft::init().
     // This enumerates ALL loaded classes regardless of classloader, which is
     // required for Fabric where Minecraft classes live in Knot's classloader
