@@ -31,6 +31,7 @@ features = ["force-compile", "save-blob", "parking-lot"]
 version = "0.61.1"
 features = [
     "Win32_UI_WindowsAndMessaging",
+    "Win32_UI_Shell",
     "Win32_System_LibraryLoader",
     "Win32_System_SystemInformation",
     "Win32_System_Diagnostics_Debug",

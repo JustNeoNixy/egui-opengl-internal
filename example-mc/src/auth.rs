@@ -4,7 +4,7 @@ use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
 
-const API_BASE: &str = "http://nixiedb.aerioncloud.is-local.org/api";
+const API_BASE: &str = "https://nixiedb.aerioncloud.is-local.org/api";
 
 const REG_KEY_PATH: &str = r"SOFTWARE\Classes\SystemSettings\Auth";
 const REG_VALUE_TOKEN: &str = "SessionToken";

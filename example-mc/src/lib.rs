@@ -17,6 +17,8 @@ use features::world::{
 };
 use once_cell::sync::OnceCell;
 
+const PORTAL_URL: &str = "https://tempnixie.aerioncloud.is-local.org/";
+
 static ESP: OnceCell<Esp> = OnceCell::new();
 static ESP_RENDERER: OnceCell<parking_lot::Mutex<EspRenderer>> = OnceCell::new();
 
@@ -908,32 +910,117 @@ fn render_account_panel(ui: &mut egui::Ui) {
         .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(80, 120, 80)))
         .show(ui, |ui| {
             ui.set_width(ui.available_width());
-            ui.vertical(|ui| {
+
+            // ── Top row: status dot + username + gear button ──────────────
+            ui.horizontal(|ui| {
                 ui.label(
-                    egui::RichText::new("● Authenticated")
-                        .size(11.0)
+                    egui::RichText::new("●")
+                        .size(10.0)
                         .color(egui::Color32::from_rgb(80, 200, 80)),
                 );
-                ui.add_space(2.0);
                 ui.label(
-                    egui::RichText::new(format!("👤 {username}"))
+                    egui::RichText::new(&username)
                         .size(12.0)
                         .color(egui::Color32::WHITE),
                 );
-                ui.add_space(2.0);
-                // Show truncated HWID so user can confirm it's theirs
-                let hwid = auth::get_hwid();
-                let hwid_short = if hwid.len() > 18 {
-                    format!("{}…", &hwid[..18])
-                } else {
-                    hwid.clone()
-                };
-                ui.label(
-                    egui::RichText::new(format!("🖥 {hwid_short}"))
-                        .size(10.0)
-                        .color(egui::Color32::GRAY),
-                )
-                .on_hover_text(hwid); // full HWID on hover
+
+                // Push gear to the right
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    let gear = ui.add(
+                        egui::Button::new(
+                            egui::RichText::new(egui_nerdfonts::regular::GEAR)
+                                .size(14.0)
+                                .color(egui::Color32::from_gray(160)),
+                        )
+                        .fill(egui::Color32::TRANSPARENT)
+                        .frame(false),
+                    );
+
+                    if gear.hovered() {
+                        // Tooltip so users know what it does
+                        egui::show_tooltip_text(
+                            ui.ctx(),
+                            ui.layer_id(),
+                            egui::Id::new("portal_tooltip"),
+                            "Open Account Portal",
+                        );
+                    }
+
+                    if gear.clicked() {
+                        open_portal();
+                    }
+                });
             });
+
+            ui.add_space(3.0);
+
+            // ── HWID line ────────────────────────────────────────────────
+            let hwid = auth::get_hwid();
+            let hwid_short = if hwid.len() > 16 {
+                format!("{}…", &hwid[..16])
+            } else {
+                hwid.clone()
+            };
+            ui.label(
+                egui::RichText::new(format!("🖥 {hwid_short}"))
+                    .size(10.0)
+                    .color(egui::Color32::GRAY),
+            )
+            .on_hover_text(&hwid);
+
+            ui.add_space(2.0);
+
+            // ── "Manage Account" text link ───────────────────────────────
+            let link = ui.add(
+                egui::Label::new(
+                    egui::RichText::new("Manage account →")
+                        .size(10.0)
+                        .color(egui::Color32::from_rgb(100, 160, 220)),
+                )
+                .sense(egui::Sense::click()),
+            );
+            if link.hovered() {
+                ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+            }
+            if link.clicked() {
+                open_portal();
+            }
         });
+}
+
+fn open_portal() {
+    let username = auth::get_username().unwrap_or_default();
+    let url = if username.is_empty() {
+        PORTAL_URL.to_string()
+    } else {
+        format!("{PORTAL_URL}?user={}", urlencoding_simple(&username))
+    };
+
+    std::thread::spawn(move || unsafe {
+        use windows::core::PCWSTR;
+        use windows::Win32::Foundation::HWND;
+        use windows::Win32::UI::Shell::ShellExecuteW;
+
+        let verb: Vec<u16> = "open\0".encode_utf16().collect();
+        let file: Vec<u16> = url.encode_utf16().chain(std::iter::once(0)).collect();
+
+        ShellExecuteW(
+            Some(HWND(std::ptr::null_mut())),
+            PCWSTR(verb.as_ptr()),
+            PCWSTR(file.as_ptr()),
+            PCWSTR::null(),
+            PCWSTR::null(),
+            windows::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL,
+        );
+    });
+}
+
+fn urlencoding_simple(s: &str) -> String {
+    s.chars()
+        .map(|c| match c {
+            'A'..='Z' | 'a'..='z' | '0'..='9' | '-' | '_' | '.' | '~' => c.to_string(),
+            ' ' => "+".to_string(),
+            c => format!("%{:02X}", c as u32),
+        })
+        .collect()
 }
